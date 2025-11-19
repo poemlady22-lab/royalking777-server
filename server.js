@@ -1,92 +1,80 @@
 // server.js
-
 const express = require("express");
-const path = require("path");
+const bodyParser = require("body-parser");
 const axios = require("axios");
 
 const app = express();
 
-// Parse JSON body from Facebook
-app.use(express.json());
+// parse JSON body
+app.use(bodyParser.json());
 
-// Serve your static files (public/index.html etc.)
-app.use(express.static(path.join(__dirname, "public")));
+// ENV VARIABLES FROM RENDER
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;        // royalking777
+const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// 1️⃣ VERIFY WEBHOOK (Facebook -> GET /webhook)
+// 1) VERIFY WEBHOOK (FACEBOOK CALLS THIS WITH GET)
 app.get("/webhook", (req, res) => {
-  const VERIFY_TOKEN = process.env.VERIFY_TOKEN; // must match Facebook dashboard
-
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (mode && token && mode === "subscribe" && token === VERIFY_TOKEN) {
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
     console.log("WEBHOOK VERIFIED");
-    res.status(200).send(challenge);
-  } else {
-    console.log("WEBHOOK VERIFICATION FAILED");
-    res.sendStatus(403);
+    return res.status(200).send(challenge);
   }
+
+  console.log("WEBHOOK VERIFICATION FAILED");
+  return res.sendStatus(403);
 });
 
-// 2️⃣ RECEIVE MESSAGES (Facebook -> POST /webhook)
+// 2) RECEIVE MESSAGES (FACEBOOK CALLS THIS WITH POST)
 app.post("/webhook", (req, res) => {
   const body = req.body;
-  console.log("Webhook POST:", JSON.stringify(body, null, 2));
+  console.log("🔥 Incoming webhook:", JSON.stringify(body, null, 2));
 
-  // Make sure this is a page subscription
   if (body.object === "page") {
     body.entry.forEach(entry => {
       const event = entry.messaging && entry.messaging[0];
       if (!event) return;
 
-      const senderPsid = event.sender && event.sender.id;
+      const senderId = event.sender.id;
 
-      // If the user sent a text message
+      // when user sends a text message
       if (event.message && event.message.text) {
-        const text = event.message.text;
-        // Echo it back
-        sendTextMessage(senderPsid, `You said: ${text}`);
+        const userText = event.message.text;
+        console.log("User said:", userText);
+
+        // reply to user
+        callSendAPI(senderId, "Hello 👋 I received: " + userText);
       }
     });
 
-    // Always respond 200 to Facebook quickly
-    res.sendStatus(200);
+    // must respond 200 quickly
+    res.status(200).send("EVENT_RECEIVED");
   } else {
     res.sendStatus(404);
   }
 });
 
-// 3️⃣ SEND MESSAGE BACK TO USER
-function sendTextMessage(psid, text) {
-  const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
-
-  if (!PAGE_ACCESS_TOKEN) {
-    console.error("PAGE_ACCESS_TOKEN is missing in environment!");
-    return;
-  }
-
+// 3) FUNCTION TO SEND MESSAGE BACK
+function callSendAPI(senderPsid, responseText) {
   const url = `https://graph.facebook.com/v20.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+
   const payload = {
-    recipient: { id: psid },
-    message: { text },
+    recipient: { id: senderPsid },
+    message: { text: responseText }
   };
 
   axios
     .post(url, payload)
-    .then(() => console.log("Message sent to", psid))
+    .then(() => console.log("✅ Message sent to", senderPsid))
     .catch(err => {
-      console.error(
-        "Error sending message:",
-        err.response?.data || err.message
-      );
+      console.error("❌ Error sending message:", err.response?.data || err.message);
     });
 }
 
-// 4️⃣ START SERVER (Render sets process.env.PORT)
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on port " + PORT));
+// START SERVER
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
