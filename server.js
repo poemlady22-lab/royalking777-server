@@ -92,3 +92,24 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log("Server running on port " + PORT);
 });
+// TELEGRAM WEBHOOK
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+const telegramUrl = `https://api.telegram.org/bot${TELEGRAM_TOKEN}`;
+
+app.post("/telegram", async (req, res) => {
+  const message = req.body;
+
+  console.log("🔥 Telegram incoming:", JSON.stringify(message, null, 2));
+
+  if (message.message && message.message.text) {
+    const chatId = message.message.chat.id;
+    const userText = message.message.text;
+
+    await axios.post(`${telegramUrl}/sendMessage`, {
+      chat_id: chatId,
+      text: "You said: " + userText
+    });
+  }
+
+  res.sendStatus(200);
+});
