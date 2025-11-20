@@ -113,3 +113,17 @@ app.post("/telegram", async (req, res) => {
 
   res.sendStatus(200);
 });
+{
+  "name": "royalking777-server",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "axios": "^1.6.2",
+    "viber-bot": "^1.0.18"
+  }
+}
